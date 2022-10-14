@@ -1,0 +1,62 @@
+- Define the problem
+    -Given a SAM file of uniquely mapped reads, remove all PCR duplicates
+    -check for PCR duplicate:
+        -is col 0/QNAME (UMI) the same?
+        -is col 2/RNAME the same?
+        -is col 3/POS the same?
+        -is col 1/FLAG strand specific? 
+           if flag  16 == true (reverse complemented) 
+    -Must use Samtools SORT and adjust for soft clipping
+    -Single-end vs paired-end
+
+- Write examples:
+    - Include a properly formated sorted input sam file
+    - Include a properly formated expected output sam file
+
+- Develop your algorithm using pseudocode:
+*Will have list of known UMI's for comparisons [UMI_known]
+*Major dataframe: 
+    PCRdup_dict
+    -key = tuple of [UMI, pos, chrom_num, entry_str]
+    -value = [count]
+
+    open the sorted SAM file:
+        open output file:
+            parse through each line of the SAM file (for loop)
+                -if the line does not start with "@": (or could check if starts with "NS")
+                    *split the line by tabs to create the columns that we're used to looking through to check flags
+                    *save entry in a string for later (string will be reset at the end of every loop) [entry_str]
+
+                    -Check col 0 (QNAME) UMI: #ex:NS500451:154:HWKTMBGXX:1:11101:15364:1139:GAACAGGT
+                        *split the QNAME by ":"
+                        *string following the last colon is [UMI] (len(split) - 1 = 7)
+                        *if UMI in UMI_known -> continue
+                            *else break out of this loop and go back to original SAM file
+
+                    -check col 3 (POS):
+                        *save position as a global variable [pos]
+                        *using soft_clip() function, check CIGAR string (col6) for soft clipping and adjust position.
+                            -if CIGAR_str contains S, there is soft clipping and pos will need to be adjusted
+                            -Are there other important CIGAR_str values to check for?
+                                *check CIGAR_str for minus strand and adjust values accordingly
+                    
+                    -check col 2 (RNAME):
+                        *save value as global variable [chrom_num]
+                    
+                    -save variables to tuple and compare to dictionary
+                        curr_entry = [UMI, pos, chrom_num, entry_str]
+                            -if(curr_entry in PCRdup_dict):
+                                *increment the counter for PCR duplicates
+                                *do not write anything to output file.
+                            -else if(curr_entry not in PCRdup_dict):
+                                *add to dictionary, with value = [1]
+                                *write entry_str to output file
+                            -continue back to the original SAM file
+
+- Determine high level functions
+    - Soft Clipping Checker:
+        ```Take in CIGAR string, check if soft clipping occured. If true, adjust 5' position. If false, do not alter position. Return 5' position```
+        def soft_clip(str: CIGAR_str, int: pos_5) -> str
+            return pos_5 
+        soft_clip("2S12M", 113) -> 111
+            input: CIGAR_str = "2S12M", pos_5 = 113 --> return: pos_5 = 111
