@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 
-import argparse
 import re
 
 '''This module is a collection of useful bioinformatics functions
 written during the Bioinformatics and Genomics Program coursework.
 You should update this docstring to reflect what you would like it to say'''
 
-__version__ = "0.3"         # Read way more about versioning here:
+__version__ = "0.4"         # Read way more about versioning here:
                             # https://en.wikipedia.org/wiki/Software_versioning
 
 DNA_bases = set('ATGCNatcgn')
@@ -56,68 +55,60 @@ def oneline_fasta(input_file:str, output_file:str) -> str:
 
 
 def cigar_clip(cigar_: str, strand_: str, pos_: int) -> int:
-    #regex for the cigar string
-    #regular expression to split up the entire string based on separating numbers from any letters
+    '''Take in SAM file cigar string, strand, and position. Determine if soft clipping has occurred, 
+    and adjust the position accordingly. Return new adjusted start position.'''
 
-#regex possible patterns: 
-    #r'(\d+)(\w)', '40M25N5M'
-    #[0-9]+[MIDNSHPX](,[0-9]+[MIDNSHPX])+
-    #r'([0-9]+)([MIDNSHPX=])'
-    #r'([0-9]+)([MIDNSX=])' vs r'([0-9]+[MIDNSX=])' --> what would be the difference in output matches?
-    #re.findall(r'([0-9]+)([MIDNSX=])', cigar)
-    #ignore I, X, = ?
-
-    #1.1CHECK CIGAR STRING/soft clipping --> soft_clip() or other outside function
-                        #M, D, N, right S
-                            # + strand with right s = subtract value from pos
-                            # - strand with left s, M, N, D = add value to pos
-                        #minus strands should have -1 for correct inclusivity
+    #Adjusting the start position conditions:
+        #M, D, N, S (ignore other letters for this assignment)
+            # + strand with right s = subtract value from pos
+            # - strand with left s, M, N, D = add value to pos
+                #minus strands should also have -1 for correct inclusivity
     
     pos_ = int(pos_)
-    #ignore I, X, = ?
-    cigar_values = re.findall(r'([0-9]+)([MDNS])', cigar_)
-    #print(cigar_values)
+    cigar_values = re.findall(r'([0-9]+)([MDNS])', cigar_) #regular expression to split up the entire string based on separating numbers from any letters
     #will produce list of pairs of tuples (num, letter)
 
-#is this using the right variables???
     counter = 0 #used to keep track of the right vs left S (soft clipping)
     if(strand_ == "-"):
-        pos_ = int(pos_) - 1
+        pos_ = int(pos_) - 1 #for correct inclusivity
     for i in cigar_values:
         number = int(i[0])
         letter = i[1]
 
         if(strand_ == "+"):
-            #check for an S on the left side
+            #check for an S on the right side
             #everything other letter won't affect the position
-            if(letter == 'S' and counter!=0): #soft clipping was found
-                pos_ = int(pos_) - number
-
+            if(letter == 'S'):
+                if(counter==0): #soft clipping was found
+                    pos_ = int(pos_) - number
+                    counter+=1
+            else:
+                counter+=1
+            if(counter>1):
+                break #only care about left S
 
         elif(strand_ == "-"):
-            #left_S = re.findall(r'([0-9]+)([S]')
-            if(letter == 'S' and counter ==0):
-                pos_ = int(pos_) + number
-                #don't adjust the value?
-                #pos_ = int(pos_)
+            #find any left S only
+            if(letter == 'S'):
+                if(counter!=0):
+                    pos_ = int(pos_) + number
+                    counter+=1
             elif(letter == 'M'):
                 pos_ = int(pos_) + number
+                counter+=1
             elif(letter == 'N'):
                 pos_ = int(pos_) + number
+                counter+=1
             elif(letter == 'D'):
                 pos_ = int(pos_) + number
+                counter+=1
 
-        #how the math works will depend on the strand it's on
-        counter+=1
-    return pos_
-
-   #     def soft_clip(str: CIGAR_str, int: pos_5) -> str
-    #        return pos_5 
-     #   soft_clip("2S12M", 113) -> 111
-       #     input: CIGAR_str = "2S12M", pos_5 = 113 --> return: pos_5 = 111
+        #how the math works will depend on the strand it's on, but counter will increase for each (num, letter) grouping, regardless of strand
+        #this is how I am keeping track of the right vs left S
+    return pos_ #return adjusted start position
 
 if __name__ == "__main__":
-    write tests for functions above
+    #write tests for functions above
     assert convert_phred("I") == 40, "wrong phred score for 'I'"
     assert convert_phred("C") == 34, "wrong phred score for 'C'"
     assert convert_phred("2") == 17, "wrong phred score for '2'"
@@ -141,9 +132,9 @@ if __name__ == "__main__":
     #testing = oneline_fasta('bioinfo_test.txt', 'bioinfo_result.txt')
     #assert(testing == 'Successful')
     #print('Converted FASTA correctly')
-    soft = cigar_clip('3S22M2S', '-', 33)
-    #assert(soft == 31)
-    #print(soft)
+    soft1 = cigar_clip('2S12M', '-', 33)
+    soft2 = cigar_clip('3D4N2M2S', '-', 21)
+
         #my bioinfo_test.txt file:
         # >seq1
         # A
